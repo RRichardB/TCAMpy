@@ -633,7 +633,7 @@ class TModel:
         result["immune"] = self.immune
         result["mutate"] = self.mutate
         result["mutmap"] = self.mutmap
-        result["field"]  = self.cancer
+        result["cancer"] = self.cancer
         result["stc"]    = self.stc_number
         result["rtc"]    = self.rtc_number
         result["wbc"]    = self.wbc_number
@@ -692,7 +692,7 @@ class TModel:
         # Create the figue and axis
         fig, axs = plt.subplots(2, 2, figsize=(14,14))
 
-        tumor = axs[0, 0].imshow(self.runs[run-1]["field"], vmin=0, vmax=self.pmax+1)
+        tumor = axs[0, 0].imshow(self.runs[run-1]["cancer"], vmin=0, vmax=self.pmax+1)
         fig.colorbar(tumor, ax=axs[0, 0])
         
         immune_coords = np.argwhere(self.runs[run-1]["immune"] > 0)
@@ -890,7 +890,7 @@ class TDashboard:
             or st.session_state.init_config_hash != config_hash
         ):
             self.model.init_state()
-            st.session_state.field  = self.model.field.copy()
+            st.session_state.cancer  = self.model.cancer.copy()
             st.session_state.immune = self.model.immune.copy()
             st.session_state.mutate = self.model.mutate.copy()
             st.session_state.mutmap = self.model.mutmap.copy()
@@ -911,15 +911,15 @@ class TDashboard:
         plots_height = self.get_plot_height(1, 0.9)
 
         if st.button("Modify Cell"):
-            self.model.field = st.session_state.field.copy()
+            self.model.cancer = st.session_state.cancer.copy()
             self.model.mod_cell(x_coord, y_coord, cell_value)
-            st.session_state.field = self.model.field.copy()
+            st.session_state.cancer = self.model.cancer.copy()
             st.success(f"Cell modified at ({x_coord}, {y_coord}) to {cell_value}")
 
-        field   = st.session_state.field
+        cancer  = st.session_state.cancer
         heatmap = self._create_heatmap(
             plots_height, "Initial state", "viridis",
-            "PP", 0, self.model.pmax+1, field
+            "PP", 0, self.model.pmax+1, cancer
             )
         
         st.altair_chart(heatmap, use_container_width=True)
@@ -937,7 +937,7 @@ class TDashboard:
         if st.button("Run Model"):
             with st.spinner("Running simulations..."):
                 for i in range(rep):
-                    self.model.field  = st.session_state.field.copy()
+                    self.model.cancer  = st.session_state.cancer.copy()
                     self.model.immune = st.session_state.immune.copy()
                     self.model.mutate = st.session_state.mutate.copy()
                     self.model.mutmap = st.session_state.mutmap.copy()
@@ -965,7 +965,7 @@ class TDashboard:
         latest = self.model.runs[run - 1]
         immune = latest["immune"]
         mutmap = latest["mutmap"]
-        field  = latest["field"]
+        cancer = latest["cancer"]
         stc    = latest["stc"]
         rtc    = latest["rtc"]
         wbc    = latest["wbc"]
@@ -976,7 +976,7 @@ class TDashboard:
         
         tumor_heatmap = self._create_heatmap(
             plots_height, "Tumor growth", "viridis",
-            "PP", 0, self.model.pmax+1, field, immune
+            "PP", 0, self.model.pmax+1, cancer, immune
         )
         mutation_map = self._create_heatmap(
             plots_height, "Mutation history", "redblue",
@@ -1414,8 +1414,8 @@ class TML:
             run_stats = {}
             for k, v in params.items():
                 run_stats[k] = v
-            run_stats["Tumor size"] = np.count_nonzero(model.field)
-            run_stats["Confluence"] = np.count_nonzero(model.field)/model.field.size*100
+            run_stats["Tumor size"] = np.count_nonzero(model.cancer)
+            run_stats["Confluence"] = np.count_nonzero(model.cancer)/model.cancer.size*100
             stats.append(run_stats)
 
         if stats:
