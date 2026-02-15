@@ -6,7 +6,7 @@ After you installed TCAMpy and it's dependencies you can start using the model. 
 
     import TCAMpy as tcam
 
-    M = tcam.TModel(500, 50, 10, 1, 24, 1/24, 15, 4, 5, 10)
+    M = tcam.TModel(500, 50, 15, 1, 24, 1/24, 15, 4, 5, 10)
 
 The 'TModel' class takes a number of parameters. These determine the area, the different probabilities as well as the duration
 of the model. See :ref:`api_docs` for further details about them. After you've created the class with the parameters of your
@@ -45,7 +45,7 @@ a complete example of a custom initial state, where the diagonal is filled with 
     import TCAMpy as tcam
     import numpy as np
 
-    M = tcam.TModel(500, 50, 10, 1, 24, 1/24, 15, 4, 5, 10)
+    M = tcam.TModel(500, 50, 15, 1, 24, 1/24, 15, 4, 5, 10)
 
     M.field = (M.pmax+1) * np.eye(M.side_length)
 
@@ -116,7 +116,7 @@ To use ML features provided by the module write the following code:
     # Train a model
     model, metrics = ml.train_predictor("tumor_dataset.csv", "Tumor size")
     
-    new_params = [500, 50, 10, 1, 24, 1/24, 15, 4, 4, 10]
+    new_params = [500, 50, 15, 1, 24, 1/24, 15, 4, 4, 10]
     print ("Predicted Attribute: ", ml.predict_new(new_params))
 
 You also have access to commands to save results (the field or the statistics) to an excel file, or create your own run function/loop by individually accessing cycles and cells. For details on those functions check the API Documentation.

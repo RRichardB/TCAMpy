@@ -10,7 +10,7 @@ Create a model and execute it one time. Plot the results, animate and show the s
 
     import TCAMpy as tcam
 
-    M = tcam.TModel(500, 50, 10, 1, 24, 1/24, 15, 4, 5, 10)
+    M = tcam.TModel(500, 50, 15, 1, 24, 1/24, 15, 4, 5, 10)
     M.run_model(plot = True, animate = True, stats = True)
 
 Multiple executions
@@ -23,7 +23,7 @@ Run the model multiple (in this case 5) times and plot the average results.
     import TCAMpy as tcam
     import matplotlib.pyplot as plt
 
-    M = tcam.TModel(500, 50, 10, 1, 24, 1/24, 15, 4, 5, 10)
+    M = tcam.TModel(500, 50, 15, 1, 24, 1/24, 15, 4, 5, 10)
     stats = M.run_multimodel(5, M.field, plot = True, stats = True)
 
     # Check visualization for every execution
@@ -40,7 +40,7 @@ Modify the initial state by defining/changing M.field or calling 'mod_cell()' (c
     import TCAMpy as tcam
     import numpy as np
 
-    M = tcam.TModel(500, 50, 10, 1, 24, 1/24, 15, 4, 5, 10)
+    M = tcam.TModel(500, 50, 15, 1, 24, 1/24, 15, 4, 5, 10)
 
     M.field = (M.pmax+1) * np.eye(M.side_length)
     M.field[0][0] = 0
@@ -57,7 +57,7 @@ Create a streamlit dashboard. Run the file containing the code with streamlit to
 
     import TCAMpy as tcam
 
-    M = tcam.TModel(500, 50, 10, 1, 24, 1/24, 15, 4, 5, 10)
+    M = tcam.TModel(500, 50, 15, 1, 24, 1/24, 15, 4, 5, 10)
 
     D = tcam.TDashboard(M)
     D.run_dashboard()
@@ -77,7 +77,7 @@ Use ML features to generate dataset, train a model and predict tumor size based 
 
     import TCAMpy as tcam
     
-    M  = tcam.TModel(500, 50, 10, 1, 24, 1/24, 15, 4, 4, 10)
+    M  = tcam.TModel(500, 50, 15, 1, 24, 1/24, 15, 4, 4, 10)
     ml = tcam.TML(M)
     
     # Select parameters to randomize and ranges
@@ -93,7 +93,7 @@ Use ML features to generate dataset, train a model and predict tumor size based 
     # Train a model
     model, metrics = ml.train_predictor("tumor_dataset.csv", "Tumor size")
     
-    new_params = [500, 50, 10, 1, 24, 1/24, 15, 4, 4, 10]
+    new_params = [500, 50, 15, 1, 24, 1/24, 15, 4, 4, 10]
     print ("Predicted Attribute: ", ml.predict_new(new_params))
 
 Example files

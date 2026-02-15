@@ -36,24 +36,24 @@ class TModel:
     """
     
     def __init__(self, cycles, side, pmax, PA, CCT, Dt, PS, mu, I, M):
-        # Parameters
+        # Parameters     
         self.cycles = cycles
-        self.side = side
-        self.pmax = pmax
-        self.CCT = CCT
-        self.Dt = Dt
-        self.mu = mu
-        self.I = I
-        self.M = M
+        self.side   = side
+        self.pmax   = pmax
+        self.CCT    = CCT
+        self.Dt     = Dt
+        self.mu     = mu
+        self.I      = I
+        self.M      = M
         
         # Single model data
         self.stc_number = []
         self.rtc_number = []
         self.wbc_number = []
+        self.cancer = []
         self.immune = []
         self.mutate = []
         self.mutmap = []
-        self.field  = []
         self.images = []
         
         # Multiple models data
@@ -61,8 +61,8 @@ class TModel:
         self.runs  = []
         
         # Chances
-        self.PP = 24*Dt/CCT*100
-        self.PM = 100*mu/24
+        self.PP = 24 * Dt/CCT * 100
+        self.PM = 100 * mu/24
         self.PA = PA
         self.PS = PS
         
@@ -77,7 +77,7 @@ class TModel:
         Creates the field for immune cells and mutations too.
         """
 
-        self.field  = np.zeros((self.side, self.side))
+        self.cancer = np.zeros((self.side, self.side))
         self.immune = np.zeros((self.side, self.side))
         self.mutate = np.zeros((self.side, self.side))
         self.mutmap = np.zeros((self.side, self.side))
@@ -90,11 +90,8 @@ class TModel:
         Saves the coordinates of tumor cells to self.tumor_cells.
         """
      
-        # Where are tumor cells?
-        coords = np.nonzero(self.field)
-        coords = np.transpose(coords)
-        
-        # Shuffle to randomize direction
+        # Tumor cell coords randomized
+        coords = np.argwhere(self.cancer > 0)
         np.random.shuffle(coords)
         self.tumor_cells = coords
 
@@ -105,7 +102,7 @@ class TModel:
         """
         
         # Count RTC and STC
-        stc_count = np.count_nonzero(self.field == self.pmax + 1)
+        stc_count = np.count_nonzero(self.cancer == self.pmax + 1)
         rtc_count = len(self.tumor_cells) - stc_count
         
         # Save the current number
@@ -125,43 +122,32 @@ class TModel:
             list: a list with the coords of the neighbouring cells
         """
 
-        directions = [
-            (-1, 0), (1, 0),
-            (0, -1), (0, 1),
-            (-1,-1), (-1,1),
-            (1, -1), (1, 1)]
+        r_start = max(1, x - 1)
+        r_end   = min(self.side - 1, x + 2)
+        c_start = max(1, y - 1)
+        c_end   = min(self.side - 1, y + 2)
+    
+        # Extract views of the field and immune grids
+        f_view = self.cancer[r_start:r_end, c_start:c_end]
+        i_view = self.immune[r_start:r_end, c_start:c_end]
+    
+        match neighbour_type:
+            case 1:  # Empty
+                mask = (f_view == 0) & (i_view == 0)
+            case 2:  # Tumor
+                mask = f_view > 0
+            case 3:  # Immune
+                mask = i_view > 0
+            case 4:  # Any Cell
+                mask = (f_view > 0) | (i_view > 0)
+            case 5:  # Not Immune
+                mask = i_view == 0
+    
+        matches = np.argwhere(mask) 
+        matches += [r_start, c_start]
         
-        coords = []
-        for dx, dy in directions:
-            nx, ny = x + dx, y + dy
-            if 0 < nx < self.side-1 and 0 < ny < self.side-1:
-                coords.append([nx, ny])
-                
-        neighbours = []
-        for n in coords:
-            match neighbour_type:
-                case 1:
-                    # Return list of empty cells
-                    if (self.field[n[0],n[1]] == 0 and self.immune[n[0],n[1]] == 0):
-                        neighbours.append(n)
-                case 2:
-                    # Return list of tumor cells
-                    if self.field[n[0],n[1]] != 0:
-                        neighbours.append(n)
-                case 3:
-                    # Return list of immune cells
-                    if self.immune[n[0],n[1]] != 0:
-                        neighbours.append(n)
-                case 4:
-                    # Return list of any cells
-                    if (self.field[n[0],n[1]] != 0 or self.immune[n[0],n[1]] != 0):
-                        neighbours.append(n)
-                case 5:
-                    # # Return list of free/immune cells
-                    if self.immune[n[0],n[1]] == 0:
-                        neighbours.append(n)
-                    
-        return neighbours   
+        is_center = (matches[:, 0] == x) & (matches[:, 1] == y)
+        return matches[~is_center].tolist()
     
     # ---------------------------------------------------------------------
     def cell_step(self, x, y, step_type):
@@ -182,20 +168,20 @@ class TModel:
         match step_type:
             case 1:
                 # Proliferation STC -> STC + STC
-                self.field[nx, ny] = self.pmax+1
+                self.cancer[nx, ny] = self.pmax+1
             case 2:
                 # Proliferation STC -> STC + RTC
-                self.field[nx, ny] = self.pmax
+                self.cancer[nx, ny] = self.pmax
             case 3:
                 # Proliferation RTC -> RTC + RTC
-                self.field[x,   y] -= 1
-                self.field[nx, ny] = self.field[x, y]
+                self.cancer[x, y]   -= 1
+                self.cancer[nx, ny] = self.cancer[x, y]
             case 4:
                 # Migration
-                self.field[nx, ny] = self.field[x, y]
-                self.field[x,   y] = 0
+                self.cancer[nx, ny] = self.cancer[x, y]
+                self.cancer[x, y]   = 0
         
-        if step_type < 4 and self.field[x, y] == 0:
+        if step_type < 4 and self.cancer[x, y] == 0:
             self.mutate[x, y] = 0
             
         elif step_type < 4:
@@ -209,7 +195,7 @@ class TModel:
                 
                 # Mutation influences pp value
                 if step_type != 1:
-                    self.field[nx, ny] = np.clip(self.field[nx, ny]+mut, 1, self.pmax)
+                    self.cancer[nx, ny] = np.clip(self.cancer[nx, ny]+mut, 1, self.pmax)
                     
             self.mutmap[nx, ny] = self.mutate[nx, ny]
         else:
@@ -227,7 +213,7 @@ class TModel:
         
         for cell in self.tumor_cells:
             x, y = cell
-            is_stc = (self.field[x, y] == self.pmax + 1)
+            is_stc = (self.cancer[x, y] == self.pmax + 1)
         
             # Probabilities
             probs = np.array([self.PA, self.PP, self.PM, 0], dtype=float)
@@ -241,9 +227,8 @@ class TModel:
             # Choose action
             choice = np.random.choice(4, p=probs)
         
-            if choice == 0:  # apoptosis
-                self.field[x, y]  = 0
-                self.mutate[x, y] = 0
+            if choice == 0:    # apoptosis
+                self.cancer[x, y] = self.mutate[x, y] = 0
                 
             elif choice == 1:  # proliferation
                 if is_stc and np.random.rand() < self.PS/100:
@@ -251,7 +236,7 @@ class TModel:
                 elif is_stc:
                     self.cell_step(x, y, 2)   # STC-RTC division
                 else:
-                    self.cell_step(x, y, 3)   # RTC-RTC division
+                    self.cell_step(x, y, 3)   # RTC-RTC division  
                     
             elif choice == 2:  # migration
                 self.cell_step(x, y, 4)
@@ -298,61 +283,60 @@ class TModel:
         # Current tumor cell locations
         self.find_tumor_cells()
         tumor_size = len(self.tumor_cells)
+        
         if tumor_size == 0:
-            # Count existing immune cells
-            coords = np.argwhere(self.immune > 0)
-            self.immune_cells = coords
-            immune_size = len(coords)
-            for x, y in coords:
-                self.immune[x, y] -= 1
-            self.wbc_number.append(immune_size)
+            self.immune = np.maximum(0, self.immune - 1)
+            self.wbc_number.append(np.count_nonzero(self.immune))
             return
 
-        tumor_x = [x for x, _ in self.tumor_cells]
-        tumor_y = [y for _, y in self.tumor_cells]
-    
-        # Find spawnpoints (a "frame" around tumor)
-        frame = []
-        left   = max(1, min(tumor_x) - offset)
-        right  = min(self.side - 2, max(tumor_x) + offset)
-        top    = max(1, min(tumor_y) - offset)
-        bottom = min(self.side - 2, max(tumor_y) + offset)
+        # Immune spawnpoints = "frame" around tumor
+        min_coords = self.tumor_cells.min(axis=0) - offset
+        max_coords = self.tumor_cells.max(axis=0) + offset
         
-        for j in range(left, right + 1):
-            frame.append([top, j])
-            frame.append([bottom, j])
-        for i in range(top, bottom + 1):
-            frame.append([i, left])
-            frame.append([i, right])
-        self.spawnpoints = np.array(frame)
+        x1, y1 = np.clip(min_coords, 1, self.side - 2)
+        x2, y2 = np.clip(max_coords, 1, self.side - 2)
+        
+        t = np.column_stack((np.full(y2-y1+1, x1), np.arange(y1, y2+1)))
+        b = np.column_stack((np.full(y2-y1+1, x2), np.arange(y1, y2+1)))
+        l = np.column_stack((np.arange(x1+1, x2), np.full(x2-x1-1, y1)))
+        r = np.column_stack((np.arange(x1+1, x2), np.full(x2-x1-1, y2)))
+        
+        self.spawnpoints = np.concatenate([t, b, l, r])
         
         # Immune exhaustion = time-dependent decline
-        IE = 1.0 / (1.0 + alpha * self.cycles)
-        IE = max(IE, 0.2)
+        IE = max(1.0 / (1.0 + alpha * self.cycles), 0.2)
 
-        # Saturating spawn (sigmoid-like), delayed onse
+        # Saturating spawn (sigmoid-like), delayed onset
         spawn = self.I * (tumor_size / (tumor_size + self.I * 100)) * IE
         
-        coords = np.nonzero(self.immune)
-        it_ratio = len(np.transpose(coords)) / tumor_size
-        for cell in self.spawnpoints:
-            x, y = cell
-            if np.random.rand() < spawn / 50:
-                if self.immune[x, y] == 0 and self.field[x, y] == 0 and it_ratio <= it_targ:
-                    # Immune cell lifespan: I-1 weeks to I+1 weeks
-                    min_life = min(24, (self.I-1)*168)
-                    max_life = (self.I+1)*168
-                    self.immune[x, y] = np.random.randint(min_life, max_life)
+        current_wbc_count = np.count_nonzero(self.immune)
+        it_ratio = current_wbc_count / tumor_size
+        
+        if it_ratio <= it_targ:
+            # Choose all spawnpoints
+            spawn_mask = np.random.random(len(self.spawnpoints)) < (spawn / 50)
+            potential_spawns = self.spawnpoints[spawn_mask]
+            
+            if len(potential_spawns) > 0:
+                # Filter for empty slots
+                px, py = potential_spawns[:, 0], potential_spawns[:, 1]
+                valid = (self.cancer[px, py] == 0) & (self.immune[px, py] == 0)
+                final_coords = potential_spawns[valid]
+                
+                if len(final_coords) > 0:
+                    min_life, max_life = min(24, (self.I-1)*168), (self.I+1)*168
+                    self.immune[final_coords[:, 0], final_coords[:, 1]] = np.random.randint(
+                        min_life, max_life, size=len(final_coords))
                   
         # Chemoattractant map for tumor density
-        self.chemo = (self.field > 0).astype(float)
+        self.chemo = (self.cancer > 0).astype(float)
         self.chemo = gaussian_filter(self.chemo, sigma=5)
         self.chemo = self.chemo / np.max(self.chemo)
                 
         # Immune action
-        coords = np.nonzero(self.immune)
+        coords = np.argwhere(self.immune > 0)
         kills_per_hour = 0
-        self.immune_cells = np.transpose(coords)
+        self.immune_cells = coords
         
         # Temporary immune grid
         new_immune = np.zeros_like(self.immune)
@@ -369,7 +353,7 @@ class TModel:
                 kill = (0.05*self.I) * np.exp(-0.25*self.mutate[tx,ty]) * IE
                 kill = min(kill, 0.3)
                 if np.random.rand() < kill:
-                    self.field[tx, ty] = 0
+                    self.cancer[tx, ty] = 0
                     self.mutate[tx, ty] = 0
                     kills_per_hour += 1
 
@@ -420,13 +404,13 @@ class TModel:
         if mode == 1:
             # Create the figure
             self.fig, self.ax = plt.subplots()
-            self.ax.imshow(self.field)
+            self.ax.imshow(self.cancer)
             self.ax.set_title(str(self.cycles)+ " hour cell growth")
             self.ax.set_xlabel(str(self.side*10) +   " micrometers")
             self.ax.set_ylabel(str(self.side*10) +   " micrometers")
         elif mode == 2:
             # Save the current frame
-            growth = self.ax.imshow(self.field, animated=True)
+            growth = self.ax.imshow(self.cancer, animated=True)
             immune_coords = np.argwhere(self.immune > 0)
             immune = self.ax.scatter(immune_coords[:,1], immune_coords[:,0], c='blue', s=10)
             self.images.append([growth, immune])
@@ -437,13 +421,13 @@ class TModel:
     # ---------------------------------------------------------------------
     def save_field_to_excel(self, file_name):
         """
-        Saves the current state of self.field to an excel file.
+        Saves the current state of self.cancer to an excel file.
         
         Parameters:
             file_name (str): name of the excel file
         """
 
-        pd.DataFrame(self.field).to_excel(file_name, index=False)
+        pd.DataFrame(self.cancer).to_excel(file_name, index=False)
 
     # ---------------------------------------------------------------------
     def mod_cell(self, x, y, value):
@@ -455,7 +439,7 @@ class TModel:
             value (int): the new value at the given position
         """
         
-        self.field[y][x] = value
+        self.cancer[y][x] = value
 
     # ---------------------------------------------------------------------
     def get_prolif_potentials(self):
@@ -466,7 +450,7 @@ class TModel:
             dict: a dictionary of the proliferation potentials
         """
         
-        nonzero_field  = np.array(self.field)[np.array(self.field) > 0]
+        nonzero_field  = np.array(self.cancer)[np.array(self.cancer) > 0]
         unique, counts = np.unique(nonzero_field, return_counts=True)
         prolif_potents = {}
         
@@ -486,7 +470,7 @@ class TModel:
             dict: a dictionary of the statistical properties
         """
         
-        nonzero_field = self.field[self.field > 0]
+        nonzero_field = self.cancer[self.cancer > 0]
 
         # Statistics
         if nonzero_field.size != 0:
@@ -502,7 +486,7 @@ class TModel:
                 "Final RTC":  self.rtc_number[self.cycles-1],
                 "Final WBC":  self.wbc_number[self.cycles-1],
                 "Tumor Size": nonzero_field.size,
-                "Confluence": nonzero_field.size/self.field.size*100,
+                "Confluence": nonzero_field.size/self.cancer.size*100,
             }
             
             if self.I > 0:
@@ -522,7 +506,11 @@ class TModel:
                 stats[f"{hour}h_RTC"] = self.rtc_number[idx]
                 stats[f"{hour}h_WBC"] = self.wbc_number[idx]
             
-        else: stats = {"Status": "Extinct"}
+        else: stats = {
+            "Tumor Size": 0,
+            "Confluence": 0,
+            "Status": "Extinct"
+            }
         return stats
     
     # ---------------------------------------------------------------------
@@ -565,7 +553,7 @@ class TModel:
         """
 
         # Create initial state
-        if len(self.field) == 0: self.init_state()
+        if len(self.cancer) == 0: self.init_state()
         self.find_tumor_cells()
         if len(self.immune) == 0:
             self.immune = np.zeros((self.side, self.side))
@@ -617,7 +605,7 @@ class TModel:
         stats = []
         
         for i in range(count):
-            self.field  = init_field.copy()
+            self.cancer = init_field.copy()
             self.immune = []
             self.mutate = []
             self.mutmap = []
@@ -645,7 +633,7 @@ class TModel:
         result["immune"] = self.immune
         result["mutate"] = self.mutate
         result["mutmap"] = self.mutmap
-        result["field"]  = self.field
+        result["field"]  = self.cancer
         result["stc"]    = self.stc_number
         result["rtc"]    = self.rtc_number
         result["wbc"]    = self.wbc_number
@@ -1507,7 +1495,7 @@ class TML:
                 [500, 50, 10, 1, 24, 1/24, 15, 4, 4, 10]
 
         Returns:
-            float: Predicted tumor size
+            float: Predicted tumor size or confluence
         """
         if self.trained_model is None:
             raise RuntimeError(
